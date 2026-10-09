@@ -10,6 +10,13 @@ import type {
   SpriteLayerInfo,
 } from './registryTypes';
 
+// YAML permits scalar values other than strings. Prototype IDs are identifiers,
+// though, and the rest of the editor (maps, registry lookups, and palette
+// search) expects them to be strings.
+function prototypeId(value: unknown): string {
+  return String(value);
+}
+
 /**
  * Convert raw tile prototypes into resolved tiles with defaulted fields.
  * Tiles have no inheritance, so this is a straightforward mapping.
@@ -18,9 +25,10 @@ export function resolveTiles(rawTiles: RawTilePrototype[]): Map<string, Resolved
   const result = new Map<string, ResolvedTile>();
 
   for (const raw of rawTiles) {
+    const id = prototypeId(raw.id);
     const resolved: ResolvedTile = {
-      id: raw.id,
-      name: String(raw.name ?? raw.id),
+      id,
+      name: String(raw.name ?? id),
       sprite: raw.sprite ?? null,
       variants: raw.variants ?? 1,
       isSubfloor: raw.isSubfloor ?? true,
@@ -28,7 +36,7 @@ export function resolveTiles(rawTiles: RawTilePrototype[]): Map<string, Resolved
       baseTurf: raw.baseTurf ?? null,
       raw,
     };
-    result.set(raw.id, resolved);
+    result.set(id, resolved);
   }
 
   return result;
@@ -249,7 +257,7 @@ export function resolveEntities(entries: EntityEntry[]): Map<string, ResolvedEnt
   // Index all prototypes by ID (including abstract ones, needed for resolution)
   const protoById = new Map<string, EntityEntry>();
   for (const entry of entries) {
-    protoById.set(entry.proto.id, entry);
+    protoById.set(prototypeId(entry.proto.id), entry);
   }
 
   // Cache resolved chains to avoid recomputing
@@ -275,10 +283,10 @@ export function resolveEntities(entries: EntityEntry[]): Map<string, ResolvedEnt
     // Collect ancestor chains (for multi-parent, merge in order)
     const ancestorChain: RawEntityPrototype[] = [];
     for (const parentId of parentIds) {
-      const parentChain = buildChain(parentId, new Set(visited));
+      const parentChain = buildChain(prototypeId(parentId), new Set(visited));
       for (const ancestor of parentChain) {
         // Avoid duplicates if multiple parents share ancestors
-        if (!ancestorChain.some((a) => a.id === ancestor.id)) {
+        if (!ancestorChain.some((a) => prototypeId(a.id) === prototypeId(ancestor.id))) {
           ancestorChain.push(ancestor);
         }
       }
@@ -294,15 +302,16 @@ export function resolveEntities(entries: EntityEntry[]): Map<string, ResolvedEnt
 
   for (const entry of entries) {
     const proto = entry.proto;
+    const id = prototypeId(proto.id);
 
     // Skip abstract entities from the output
     if (proto.abstract) continue;
 
-    const chain = buildChain(proto.id);
+    const chain = buildChain(id);
     const components = mergeComponents(chain);
 
     const resolved: ResolvedEntity = {
-      id: proto.id,
+      id,
       // Same coercion as tiles: YAML scalars are not guaranteed to be strings.
       name: String(proto.name ?? proto.id),
       description: String(proto.description ?? ''),
@@ -316,7 +325,7 @@ export function resolveEntities(entries: EntityEntry[]): Map<string, ResolvedEnt
       raw: proto,
     };
 
-    result.set(proto.id, resolved);
+    result.set(id, resolved);
   }
 
   return result;
@@ -330,7 +339,7 @@ export function resolveDecals(rawDecals: RawDecalPrototype[]): Map<string, Decal
   // Index all decals by ID (including abstract ones, needed for parent resolution)
   const protoById = new Map<string, RawDecalPrototype>();
   for (const raw of rawDecals) {
-    protoById.set(raw.id, raw);
+    protoById.set(prototypeId(raw.id), raw);
   }
 
   /**
@@ -346,9 +355,9 @@ export function resolveDecals(rawDecals: RawDecalPrototype[]): Map<string, Decal
 
     const ancestors: RawDecalPrototype[] = [];
     for (const parentId of parentIds) {
-      const parentChain = buildChain(parentId, new Set(visited));
+      const parentChain = buildChain(prototypeId(parentId), new Set(visited));
       for (const ancestor of parentChain) {
-        if (!ancestors.some((a) => a.id === ancestor.id)) {
+        if (!ancestors.some((a) => prototypeId(a.id) === prototypeId(ancestor.id))) {
           ancestors.push(ancestor);
         }
       }
@@ -361,9 +370,10 @@ export function resolveDecals(rawDecals: RawDecalPrototype[]): Map<string, Decal
 
   for (const raw of rawDecals) {
     if (raw.abstract) continue;
+    const id = prototypeId(raw.id);
 
     // Build chain and merge sprite info from parents
-    const chain = buildChain(raw.id);
+    const chain = buildChain(id);
     let rsiPath = '';
     let state = '';
     let tags: string[] = [];
@@ -381,8 +391,8 @@ export function resolveDecals(rawDecals: RawDecalPrototype[]): Map<string, Decal
     // Skip decals with no sprite info
     if (!rsiPath && !state) continue;
 
-    result.set(raw.id, {
-      id: raw.id,
+    result.set(id, {
+      id,
       rsiPath,
       state,
       tags,

@@ -272,7 +272,13 @@ function getAllEntities(map: ImportedMap): ImportedEntity[] {
   if (map.gridDataList && map.gridDataList.length > 0) {
     const all: ImportedEntity[] = [];
     for (const gd of map.gridDataList) {
-      all.push(...gd.entities);
+      // `Array#push(...items)` turns every entity into a function argument.
+      // Large converted maps can have more entities than the JavaScript
+      // argument limit, making Save fail with "Maximum call stack size
+      // exceeded" before the file is written.
+      for (const entity of gd.entities) {
+        all.push(entity);
+      }
     }
     return all;
   }
@@ -622,7 +628,9 @@ function buildEntityGroupsYaml(map: ImportedMap): string[] {
     }
     for (const [parentUidStr, children] of Object.entries(allContained)) {
       if (validUids.has(Number(parentUidStr))) {
-        allEntities.push(...children);
+        for (const child of children) {
+          allEntities.push(child);
+        }
       }
     }
   }

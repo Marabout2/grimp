@@ -94,6 +94,19 @@ describe('resolveEntities', () => {
     expect(result.has('Base')).toBe(false);
     expect(result.has('Real')).toBe(true);
   });
+
+  it('normalizes YAML scalar IDs and parent references to strings', () => {
+    const base = { type: 'entity', id: 100, abstract: true, components: [{ type: 'Physics' }] } as unknown as RawEntityPrototype;
+    const child = { type: 'entity', id: 101, parent: 100, components: [] } as unknown as RawEntityPrototype;
+
+    const result = resolveEntities([
+      { proto: base, category: 'Other' },
+      { proto: child, category: 'Other' },
+    ]);
+
+    expect(result.get('101')?.id).toBe('101');
+    expect(result.get('101')?.components).toEqual([{ type: 'Physics' }]);
+  });
 });
 
 describe('extractSpriteInfo', () => {
